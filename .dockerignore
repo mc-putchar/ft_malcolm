@@ -1,0 +1,5 @@
+*.subject.pdf
+build/
+*.o
+*.d
+ft_malcolm

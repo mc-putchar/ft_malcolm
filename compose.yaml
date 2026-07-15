@@ -1,0 +1,42 @@
+
+services:
+  reese:
+    image: alpine:latest
+    container_name: reese
+    cap_add:
+      - NET_ADMIN
+    command: sleep infinity
+    mac_address: 02:42:ac:14:00:41
+    networks:
+      malnet:
+        ipv4_address: 172.20.0.41
+
+  malcolm:
+    build: .
+    container_name: malcolm
+    cap_add:
+      - NET_RAW
+    volumes:
+      - ./:/app
+    working_dir: /app
+    command: sleep infinity
+    mac_address: 02:42:ac:14:00:42
+    networks:
+      malnet:
+        ipv4_address: 172.20.0.42
+
+  dewey:
+    image: alpine:latest
+    container_name: dewey
+    command: sleep infinity
+    mac_address: 02:42:ac:14:00:43
+    networks:
+      malnet:
+        ipv4_address: 172.20.0.43
+
+networks:
+  malnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24

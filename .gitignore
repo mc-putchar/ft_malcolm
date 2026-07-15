@@ -1,0 +1,7 @@
+*.subject.pdf
+build/
+.cache/
+*.o
+*.d
+ft_malcolm
+compile_commands.json
