@@ -1,0 +1,11 @@
+.cache/
+.vscode/
+.DS_Store
+build/
+compile_commands.json
+*.a
+*.o
+*.d
+test.out
+unit_test
+*.log
