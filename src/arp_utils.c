@@ -12,7 +12,11 @@
 
 #include <arpa/inet.h>
 #include <linux/if_packet.h>
+#include <net/if_arp.h>
 #include <netinet/ether.h>
+#include <netinet/in.h>
+#include <signal.h>
+#include <stdint.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -46,43 +50,29 @@ typedef struct s_arp_packet
 	struct s_arphdr	arp_hdr;
 } __attribute__((packed))	t_arp_packet;
 
-extern int	g_stop;
+extern sig_atomic_t	g_stop;
 
-static int	is_ip_match(t_ip_addr *ip1, __be32 ip2)
-{
-	uint32_t	ip1_n;
-	uint32_t	ip2_n;
-
-	if (ip1->type != AF_INET)
-	{
-		ft_printf("IP type mismatch: expected AF_INET, got %d\n", ip1->type);
-		return (0);
-	}
-	ip1_n = ip1->u_addr.ipv4.s_addr;
-	ip1_n = (uint32_t)(ntohs((uint16_t)(ip1_n >> 16)) << 16) | \
-		ntohs(ip1_n & 0xFFFF);
-	ip2_n = (uint32_t)(ntohs((__be16)(ip2 >> 16)) << 16) | \
-		ntohs((__be16)(ip2 & 0xFFFF));
-	return (ip1_n == ip2_n);
-}
-
-void	arp_parse(struct s_arp_packet *arp_reply)
+void	arp_print(struct s_arp_packet *arp)
 {
 	char	buff[INET6_ADDRSTRLEN];
 
-	ft_printf("ARP Packet:\n");
-	ft_printf("  Sender IP: %s\n", \
-		inet_ntop(AF_INET, &arp_reply->arp_hdr.sender_ip, buff, sizeof(buff)));
+	ft_printf("ARP Packet:");
+	if (ntohs(arp->arp_hdr.op) == 1)
+		ft_printf("  REQUEST\n");
+	else if (ntohs(arp->arp_hdr.op) == 2)
+		ft_printf("  REPLY\n");
+	ft_printf("  Sender IP:  %s\n", \
+		inet_ntop(AF_INET, &arp->arp_hdr.sender_ip, buff, sizeof(buff)));
 	ft_printf("  Sender MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", \
-		arp_reply->arp_hdr.sender_mac[0], arp_reply->arp_hdr.sender_mac[1], \
-		arp_reply->arp_hdr.sender_mac[2], arp_reply->arp_hdr.sender_mac[3], \
-		arp_reply->arp_hdr.sender_mac[4], arp_reply->arp_hdr.sender_mac[5]);
-	ft_printf("  Target IP: %s\n", \
-		inet_ntop(AF_INET, &arp_reply->arp_hdr.target_ip, buff, sizeof(buff)));
+		arp->arp_hdr.sender_mac[0], arp->arp_hdr.sender_mac[1], \
+		arp->arp_hdr.sender_mac[2], arp->arp_hdr.sender_mac[3], \
+		arp->arp_hdr.sender_mac[4], arp->arp_hdr.sender_mac[5]);
+	ft_printf("  Target IP:  %s\n", \
+		inet_ntop(AF_INET, &arp->arp_hdr.target_ip, buff, sizeof(buff)));
 	ft_printf("  Target MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", \
-		arp_reply->arp_hdr.target_mac[0], arp_reply->arp_hdr.target_mac[1], \
-		arp_reply->arp_hdr.target_mac[2], arp_reply->arp_hdr.target_mac[3], \
-		arp_reply->arp_hdr.target_mac[4], arp_reply->arp_hdr.target_mac[5]);
+		arp->arp_hdr.target_mac[0], arp->arp_hdr.target_mac[1], \
+		arp->arp_hdr.target_mac[2], arp->arp_hdr.target_mac[3], \
+		arp->arp_hdr.target_mac[4], arp->arp_hdr.target_mac[5]);
 }
 
 void	build_arp_reply(struct s_arp_packet *arp_reply, t_device *source, \
@@ -99,46 +89,67 @@ void	build_arp_reply(struct s_arp_packet *arp_reply, t_device *source, \
 	arp_reply->arp_hdr.proto_type = htons(ETH_P_IP);
 	arp_reply->arp_hdr.hw_len = ETH_ALEN;
 	arp_reply->arp_hdr.proto_len = sizeof(in_addr_t);
-	arp_reply->arp_hdr.op = htons(ARPOP_REPLY);
+	arp_reply->arp_hdr.op = htons(ARPOP_REQUEST);
 	ft_memcpy(arp_reply->arp_hdr.sender_mac, &source->mac, ETH_ALEN);
 	ft_memcpy(&arp_reply->arp_hdr.sender_ip, &src_ip, sizeof(src_ip));
 	ft_memcpy(arp_reply->arp_hdr.target_mac, &target->mac, ETH_ALEN);
 	ft_memcpy(&arp_reply->arp_hdr.target_ip, &tgt_ip, sizeof(tgt_ip));
-	ft_printf("Payload ready. Running...\n");
 }
 
-int	arp_send(int sockfd, int ifindex, t_arp_packet *arp_reply, \
-	t_mac_addr *src_mac)
+typedef struct s_hw_info
 {
-	struct sockaddr_ll	sock_addr;
-	ssize_t				sent;
+	int	socket;
+	int	if_index;
+}	t_hw_info;
 
-	ft_printf("Sending reply to target:\n");
-	arp_parse(arp_reply);
-	ft_bzero(&sock_addr, sizeof(sock_addr));
-	sock_addr.sll_family = ARPHRD_ETHER;
-	sock_addr.sll_ifindex = ifindex;
-	sock_addr.sll_halen = ETH_ALEN;
-	ft_memcpy(sock_addr.sll_addr, src_mac, ETH_ALEN);
-	sent = sendto(sockfd, arp_reply, sizeof(*arp_reply), 0, \
-		(struct sockaddr *)&sock_addr, sizeof(sock_addr));
-	if (sent < 0)
-		return (throw_error(1, "Error: Failed to send ARP reply."));
-	ft_printf("Sent ARP reply of size %u bytes\n", (unsigned int)sent);
+static int	arp_send(uint32_t flags, t_hw_info info, t_device *source, \
+	t_device *target)
+{
+	ssize_t				sent;
+	struct sockaddr_ll	sock_addr;
+	t_arp_packet		arp_reply;
+
+	build_arp_reply(&arp_reply, source, target);
+	while (!g_stop)
+	{
+		ft_printf("Sending reply to target\n");
+		if (flags & (1 << FL_VERBOSE))
+			arp_print(&arp_reply);
+		ft_bzero(&sock_addr, sizeof(sock_addr));
+		sock_addr.sll_family = ARPHRD_ETHER;
+		sock_addr.sll_ifindex = info.if_index;
+		sock_addr.sll_halen = ETH_ALEN;
+		ft_memcpy(sock_addr.sll_addr, &source->mac, ETH_ALEN);
+		sent = sendto(info.socket, &arp_reply, sizeof(arp_reply), 0, \
+			(struct sockaddr *)&sock_addr, sizeof(sock_addr));
+		if (sent < 0)
+			return (throw_error(1, "Error: Failed to send ARP reply."));
+		ft_printf("Sent ARP reply of size %u bytes\n", (unsigned int)sent);
+		if ((flags ^ (1 << FL_REPEAT)) & (1 << FL_REPEAT))
+			break ;
+		sleep(1);
+	}
 	return (0);
 }
 
-int	arp_listen(int ifindex, t_device *iface, t_device *source, t_device *target)
+static int	aim(t_device *target, t_arp_packet *arp)
+{
+	target->ip.type = AF_INET;
+	target->ip.u_addr.ipv4.s_addr = arp->arp_hdr.sender_ip;
+	ft_memcpy(target->mac.addr, arp->arp_hdr.sender_mac, ETH_ALEN);
+	return (1);
+}
+
+int	arp_listen(uint32_t flags, t_device *iface, t_device *source, \
+	t_device *target)
 {
 	int const		sfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
-	t_arp_packet	arp_reply;
 	ssize_t			rb;
 	unsigned char	buff[4096];
 
 	if (sfd == -1 || setsockopt(sfd, SOL_SOCKET, SO_BINDTODEVICE, iface->name, \
 		(socklen_t)ft_strlen(iface->name)) == -1)
 		return (throw_error(1, "Error: Failed to create device bound socket."));
-	build_arp_reply(&arp_reply, source, target);
 	while (!g_stop)
 	{
 		rb = recvfrom(sfd, buff, sizeof(buff), 0, NULL, NULL);
@@ -146,12 +157,14 @@ int	arp_listen(int ifindex, t_device *iface, t_device *source, t_device *target)
 			return (close(sfd), 1);
 		if ((size_t)rb < sizeof(t_arp_packet))
 			continue ;
-		arp_parse((t_arp_packet *)buff);
+		if (flags & (1 << FL_VERBOSE))
+			arp_print((t_arp_packet *)buff);
 		if (ntohs(((t_arp_packet *)buff)->eth_hdr.h_proto) == ETH_P_ARP \
 		&& ntohs(((t_arp_packet *)buff)->arp_hdr.op) == ARPOP_REQUEST \
-		&& is_ip_match(&target->ip, ((t_arp_packet *)buff)->arp_hdr.sender_ip) \
 		&& is_ip_match(&source->ip, ((t_arp_packet *)buff)->arp_hdr.target_ip) \
-		&& !arp_send(sfd, ifindex, &arp_reply, &source->mac))
+		&& (!(flags & (1 << FL_ANYTGT)) || aim(target, (t_arp_packet *)buff)) \
+		&& is_ip_match(&target->ip, ((t_arp_packet *)buff)->arp_hdr.sender_ip) \
+		&& !arp_send(flags, (t_hw_info){sfd, iface->idx}, source, target))
 			return (close(sfd), 0);
 	}
 	return (close(sfd), 0);

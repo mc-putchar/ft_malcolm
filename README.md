@@ -16,9 +16,9 @@ Exploring the Address Resolution Protocol spoofing/poisoning
 > Allowed functions:  
 > ◦ getuid, close, sigaction, signal, sleep  
 > ◦ socket, setsockopt, sendto, recvfrom  
-> ◦ inet_pton, inet_ntop, if_nametoindex, inet_addr, gethostbyname  
-> ◦ getaddrinfo, freeaddrinfo, strerror, gai_strerror  
-> ◦ getifaddrs, freeifaddrs, htons, ntohs  
+> ◦ inet_pton, inet_ntop, inet_addr, htons, ntohs  
+> ◦ getaddrinfo, freeaddrinfo, strerror, gai_strerror, gethostbyname  
+> ◦ getifaddrs, freeifaddrs, if_nametoindex  
 > ◦ printf and its family
 
 The program takes exactly 4 arguments, in this order:  
@@ -28,17 +28,24 @@ The program takes exactly 4 arguments, in this order:
   4. Target MAC
 
 When started, the program waits for an ARP request sent on the broadcast by the target, requesting the source IP.  
-The program sends a single ARP reply to the target and exits.
+The program sends a single ARP reply to the target and exits.  
 
 ### How?!
+
+Setup VMs on the same network, or conveniently, use this example docker setup:
 
 ```bash
 docker compose up -d
 docker compose exec malcolm bash
-./ft_malcolm 172.20.0.69 02:42:ac:14:00:42 172.20.0.41 02:42:ac:14:00:41
 ```
 
-In another terminal: 
+Launch the program with:
+
+```bash
+./ft_malcolm 172.20.0.43 02:42:ac:14:00:42 172.20.0.41 02:42:ac:14:00:41
+```
+
+In another terminal:
 
 ```sh
 docker compose exec reese watch -n 1 ip neigh show
@@ -47,17 +54,26 @@ docker compose exec reese watch -n 1 ip neigh show
 And final one to shoot:
 
 ```sh
-docker compose exec reese ping -c 1 172.20.0.69
+docker compose exec reese ping -c 1 dewey
 ```
 
-We could also spoof the MAC assigned to `dewey`'s IP, but to avoid the cache being immediately overwritten by the real MAC address, we can disconnect `dewey` temporarily.  
-
-```sh
-docker network disconnect ft_malcolm_malnet dewey
-```
 
 ### Why?!
 
 Proof of concept for ARP cache poisoning.  
 In theory, to escalate this into a real MITM attack, the program would need to continuously send ARP replies to keep the cache poisoned - and do so for (at least) two separate targets to intercept their communication.  
 However, this is just an educational proof of concept, with no intention of such malicious use.
+
+
+### Bonus
+
+- [x] Support hostname resolution for IPv4 and IPv6
+- [x] Verbose mode to print packet information
+- [x] Decimal notation for IP addresses
+- [x] Continuous mode to keep sending ARP replies
+
+Argument options:
+  - `-h` print help
+  - `-v` verbose output
+  - `-a` respond to any request for source IP
+  - `-r` repeat sending ARP reply indefinitely

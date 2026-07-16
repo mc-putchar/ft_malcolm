@@ -10,49 +10,91 @@
 /*                                                                            */
 /* ************************************************************************** */
 
+#include <stdint.h>
 #include <sys/types.h>
+#include <unistd.h>
 
+#include "ft_printf.h"
 #include "libft.h"
 #include "ft_malcolm.h"
 
 #define USAGE \
-"Usage: %s <SOURCE_IP> <SOURCE_MAC> <TARGET_IP> <TARGET_MAC>\n"
+"Usage: \n \
+    %s [OPTIONS] <SOURCE_IP> <SOURCE_MAC> <TARGET_IP> <TARGET_MAC>\n \
+\nOptions:\n \
+    -h  Display this help message\n \
+    -r  Repeat sending ARP reply indefinitely\n \
+    -v  Verbose output - print packet information\n \
+    -a  Reply to any ARP request for source IP\n"
 
-static int	parse_args(char **av, t_device *source, t_device *target)
+static int	parse_flags(uint32_t *flags, char *str)
 {
-	if (parse_ip_addr(av[1], &source->ip) \
-	|| parse_mac_addr(av[2], &source->mac) \
-	|| parse_ip_addr(av[3], &target->ip) \
-	|| parse_mac_addr(av[4], &target->mac))
-		return (1);
+	char	*flag;
+	int		i;
+
+	i = 0;
+	while (str[++i])
+	{
+		flag = ft_strchr(FLAGS, str[i]);
+		if (!flag)
+			return (1);
+		*flags |= 1 << (flag - FLAGS);
+	}
 	return (0);
+}
+
+static ssize_t	parse_args(int ac, char **av, t_device *source, \
+	t_device *target)
+{
+	uint32_t	flags;
+	int			i;
+	int			j;
+
+	*source = (t_device){0};
+	*target = (t_device){0};
+	flags = 0;
+	i = 0;
+	j = 0;
+	while (++i < ac)
+	{
+		if (av[i][0] != '-')
+		{
+			if ((j < 2 && ((j & 1 && parse_mac_addr(av[i], &source->mac)) \
+				|| (!(j & 1) && parse_ip_addr(av[i], &source->ip)))) \
+			|| (j > 1 && ((j & 1 && parse_mac_addr(av[i], &target->mac)) \
+				|| (!(j & 1) && parse_ip_addr(av[i], &target->ip)))))
+				return (throw_error(-1, "Error: Invalid arguments."));
+			j++;
+		}
+		else if (parse_flags(&flags, av[i]))
+			return (throw_error(-1, "Error: Invalid flags."));
+	}
+	return (flags);
 }
 
 int	main(int ac, char **av)
 {
-	ssize_t		if_idx;
+	ssize_t		flags;
 	t_device	interface;
 	t_device	source;
 	t_device	target;
 
-	if (getuid() != 0)
+	if (getuid())
 	{
-		if (ac != 5)
+		if (ac < 5)
 			ft_dprintf(STDERR_FILENO, USAGE, av[0]);
-		return (throw_error(1, "Error: This program must run as root."));
+		return (throw_error(1, "\nError: This program must run as root."));
 	}
-	if (ac != 5)
+	flags = parse_args(ac, av, &source, &target);
+	if (flags < 0 || flags & (1 << FL_HELP) || ac < 5)
 	{
 		ft_dprintf(STDERR_FILENO, USAGE, av[0]);
-		return (1);
+		return (flags < 0 || ((flags & (1 << FL_HELP)) != (1 << FL_HELP)));
 	}
-	if (parse_args(av, &source, &target))
-		return (throw_error(1, "Error: Invalid arguments."));
 	if (set_signal_handlers())
 		return (throw_error(1, "Error: Failed to set signal handlers."));
-	if_idx = get_available_interface(&interface);
-	if (if_idx == -1)
+	if (get_available_interface(&interface) < 0)
 		return (throw_error(1, "Error: No available network interface found."));
 	print_interface_info(&interface);
-	return (arp_listen((int)if_idx, &interface, &source, &target));
+	return (arp_listen((uint32_t)flags, &interface, &source, &target));
 }

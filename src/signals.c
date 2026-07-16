@@ -13,7 +13,7 @@
 #include <signal.h>
 #include <stddef.h>
 
-int	g_stop = 0;
+sig_atomic_t	g_stop = 0;
 
 static void	handle_signal(int sig)
 {

@@ -13,6 +13,7 @@
 #include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <linux/if_packet.h>
+#include "net/if.h"
 
 #include "libft.h"
 #include "ft_malcolm.h"
@@ -49,36 +50,35 @@ ssize_t	get_available_interface(t_device *interface)
 {
 	struct ifaddrs	*ifap;
 	struct ifaddrs	*i;
-	ssize_t			if_index;
 
 	if (getifaddrs(&ifap))
 		return (throw_error(-1, "Error: getifaddrs failed."));
 	i = ifap;
-	if_index = -1;
+	interface->idx = -1;
 	while (i)
 	{
 		if (i->ifa_addr && i->ifa_flags & (IFF_UP | IFF_BROADCAST) \
 		&& !(i->ifa_flags & (IFF_LOOPBACK | IFF_NOARP)))
 		{
-			if (if_index < 0)
+			if (interface->idx < 0)
 			{
-				if_index = if_nametoindex(i->ifa_name);
+				interface->idx = (int)if_nametoindex(i->ifa_name);
 				ft_strlcpy(interface->name, i->ifa_name, IFNAMSIZ);
 			}
-			if (if_index == if_nametoindex(i->ifa_name))
+			if (interface->idx == (int)if_nametoindex(i->ifa_name))
 				extract_info(i->ifa_addr->sa_family, i, interface);
 		}
 		i = i->ifa_next;
 	}
 	freeifaddrs(ifap);
-	return (if_index);
+	return (interface->idx);
 }
 
 void	print_interface_info(t_device *interface)
 {
 	ft_printf("%s\n", interface->name);
-	ft_printf("  IP: %s\n", interface->ip.str);
-	ft_printf("  MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+	ft_printf("  IP:  %s\n", interface->ip.str);
+	ft_printf("  MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",
 		interface->mac.addr[0], interface->mac.addr[1], interface->mac.addr[2],
 		interface->mac.addr[3], interface->mac.addr[4], interface->mac.addr[5]);
 }
