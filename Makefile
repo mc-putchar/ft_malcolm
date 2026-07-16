@@ -13,6 +13,7 @@ SRC += ip_utils.c
 SRC += if_utils.c
 SRC += mac_utils.c
 SRC += arp_utils.c
+SRC += ndp_utils.c
 
 OBJ := $(SRC:.c=.o)
 OBJ := $(addprefix $(OBJDIR)/, $(OBJ))

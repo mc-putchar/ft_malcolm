@@ -25,7 +25,8 @@
     -h  Display this help message\n \
     -r  Repeat sending ARP reply indefinitely\n \
     -v  Verbose output - print packet information\n \
-    -a  Reply to any ARP request for source IP\n"
+    -a  Active mode - send unsolicited reply\n \
+    -t  Reply to any target request for source IP\n"
 
 static int	parse_flags(uint32_t *flags, char *str)
 {
@@ -93,8 +94,10 @@ int	main(int ac, char **av)
 	}
 	if (set_signal_handlers())
 		return (throw_error(1, "Error: Failed to set signal handlers."));
-	if (get_available_interface(&interface) < 0)
+	if (get_available_interface(&interface, source.ip.type) < 0)
 		return (throw_error(1, "Error: No available network interface found."));
 	print_interface_info(&interface);
-	return (arp_listen((uint32_t)flags, &interface, &source, &target));
+	if (source.ip.type == AF_INET && target.ip.type == AF_INET)
+		return (arp_listen((uint32_t)flags, &interface, &source, &target));
+	return (ndp_listen((uint32_t)flags, &interface, &source, &target));
 }

@@ -18,20 +18,21 @@
 #include "libft.h"
 #include "ft_malcolm.h"
 
-static void	extract_info(int fam, struct ifaddrs *i, t_device *ifa)
+static void	extract_info(int fam, struct ifaddrs *i, t_device *ifa, \
+	int src_type)
 {
 	struct sockaddr_in	*sin;
 	struct sockaddr_in6	*sin6;
 	struct sockaddr_ll	*sll;
 
-	if (fam == AF_INET)
+	if (fam == AF_INET && fam == src_type)
 	{
 		sin = (struct sockaddr_in *)i->ifa_addr;
 		ft_memcpy(&ifa->ip.u_addr, &sin->sin_addr, sizeof(struct in_addr));
 		ifa->ip.type = AF_INET;
 		inet_ntop(AF_INET, &sin->sin_addr, ifa->ip.str, INET_ADDRSTRLEN);
 	}
-	else if (fam == AF_INET6)
+	else if (fam == AF_INET6 && fam == src_type)
 	{
 		sin6 = (struct sockaddr_in6 *)i->ifa_addr;
 		ft_memcpy(&ifa->ip.u_addr, &sin6->sin6_addr, sizeof(struct in6_addr));
@@ -46,7 +47,7 @@ static void	extract_info(int fam, struct ifaddrs *i, t_device *ifa)
 	ft_strlcpy(ifa->name, i->ifa_name, IFNAMSIZ);
 }
 
-ssize_t	get_available_interface(t_device *interface)
+ssize_t	get_available_interface(t_device *interface, int src_type)
 {
 	struct ifaddrs	*ifap;
 	struct ifaddrs	*i;
@@ -66,7 +67,7 @@ ssize_t	get_available_interface(t_device *interface)
 				ft_strlcpy(interface->name, i->ifa_name, IFNAMSIZ);
 			}
 			if (interface->idx == (int)if_nametoindex(i->ifa_name))
-				extract_info(i->ifa_addr->sa_family, i, interface);
+				extract_info(i->ifa_addr->sa_family, i, interface, src_type);
 		}
 		i = i->ifa_next;
 	}

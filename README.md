@@ -1,4 +1,4 @@
-## ft_malcolm
+# ft_malcolm
 
 > [!WARNING]
 > This project is for educational purposes only.  
@@ -10,16 +10,16 @@ Exploring the Address Resolution Protocol spoofing/poisoning
 > I don’t know  
 > Can you repeat the question?  
 
-### What?!
+## What?!
 
-> [!NOTE]
+> [!IMPORTANT]
 > Allowed functions:  
 > ◦ getuid, close, sigaction, signal, sleep  
 > ◦ socket, setsockopt, sendto, recvfrom  
 > ◦ inet_pton, inet_ntop, inet_addr, htons, ntohs  
 > ◦ getaddrinfo, freeaddrinfo, strerror, gai_strerror, gethostbyname  
 > ◦ getifaddrs, freeifaddrs, if_nametoindex  
-> ◦ printf and its family
+> ◦ printf and its family  
 
 The program takes exactly 4 arguments, in this order:  
   1. Source IP
@@ -30,7 +30,10 @@ The program takes exactly 4 arguments, in this order:
 When started, the program waits for an ARP request sent on the broadcast by the target, requesting the source IP.  
 The program sends a single ARP reply to the target and exits.  
 
-### How?!
+> [!NOTE]
+> norminette 3.3.53 compliant
+
+## How?!
 
 Setup VMs on the same network, or conveniently, use this example docker setup:
 
@@ -58,22 +61,27 @@ docker compose exec reese ping -c 1 dewey
 ```
 
 
-### Why?!
+## Why?!
 
 Proof of concept for ARP cache poisoning.  
 In theory, to escalate this into a real MITM attack, the program would need to continuously send ARP replies to keep the cache poisoned - and do so for (at least) two separate targets to intercept their communication.  
 However, this is just an educational proof of concept, with no intention of such malicious use.
 
 
-### Bonus
+## Bonus
 
+> Argument options:
+>  - `-h` print help
+>  - `-r` repeat sending ARP reply indefinitely
+>  - `-v` verbose output
+>  - `-a` active mode - don't wait for requests
+>  - `-t` respond to any target request for source IP
+
+Additionally implemented:  
 - [x] Support hostname resolution for IPv4 and IPv6
 - [x] Verbose mode to print packet information
-- [x] Decimal notation for IP addresses
 - [x] Continuous mode to keep sending ARP replies
+- [x] Active mode to attack the target without waiting for request
 
-Argument options:
-  - `-h` print help
-  - `-v` verbose output
-  - `-a` respond to any request for source IP
-  - `-r` repeat sending ARP reply indefinitely
+Also, NDP spoofing for IPv6.  
+Life is unfair.

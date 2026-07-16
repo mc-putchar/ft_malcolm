@@ -32,17 +32,21 @@ int	parse_ip_addr(char *src, t_ip_addr *ip)
 
 	if (type == AF_INET)
 	{
+		ip->type = AF_INET;
 		if (inet_pton(type, src, &ip->u_addr.ipv4) != 1 \
 		|| !inet_ntop(type, &ip->u_addr.ipv4, ip->str, INET6_ADDRSTRLEN))
 			return (resolve_hostname(src, ip));
 	}
 	else if (type == AF_INET6)
 	{
+		ip->type = AF_INET6;
 		if (inet_pton(type, src, &ip->u_addr.ipv6) != 1 \
 		|| !inet_ntop(type, &ip->u_addr.ipv6, ip->str, INET6_ADDRSTRLEN))
 			return (resolve_hostname(src, ip));
 	}
-	return (resolve_hostname(src, ip));
+	else
+		return (resolve_hostname(src, ip));
+	return (0);
 }
 
 static int	extract_ip(t_ip_addr *ip, struct sockaddr *addr)
@@ -85,7 +89,6 @@ int	resolve_hostname(char *hostname, t_ip_addr *ip)
 	return (ai == NULL);
 }
 
-// TODO: IPv6 matching
 int	is_ip_match(t_ip_addr *ip1, uint32_t ip2)
 {
 	uint32_t	ip1_n;
